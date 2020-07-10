@@ -1,0 +1,20 @@
+{
+    "name": "webgl2-poc",
+    "version": "1.0.0",
+    "description": "",
+    "main": "src/main.js",
+    "scripts": {
+        "start": "electron ./src/main.js",
+        "build": "node-gyp rebuild && yarn electron-rebuild"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "electron": "^9.0.5",
+        "nan": "^2.14.1"
+    },
+    "devDependencies": {
+        "electron-rebuild": "^1.11.0"
+    }
+}
