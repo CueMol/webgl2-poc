@@ -2,6 +2,7 @@ const {ipcRenderer} = require('electron');
 console.log("Initializing...");
 // import Manager from './context-manager.js'
 const Manager = require('./context-manager');
+const WebGLRender = require('./webgl_render');
 
 
 const myExtension = require('../build/Release/my_extension');
@@ -9,11 +10,11 @@ const myExtension = require('../build/Release/my_extension');
 
 var myobject = new myExtension.MyObject(10);
 
-
 let mgr = new Manager();
 myobject.setManager(mgr);
-
 console.log(myobject.getValue());
+
+let webgl = new WebGLRender();
 
 const drawCanvas = () => {
     let placeholder = document.getElementById('placeholder');
@@ -26,15 +27,11 @@ const drawCanvas = () => {
     let canvas = document.getElementById('canvas_area');
     canvas.width = w;
     canvas.height = h;
-
-    let wgt_id = parseInt(canvas.getAttribute("mgr_idx"));
-    console.log("typeof wgt_id", typeof wgt_id);
-    myobject.render(wgt_id, w, h);
-
-    // let context = canvas.getContext('2d');
-    // let imageData = context.createImageData(w, h);
-    // myExtension.hello(imageData.data)
-    // context.putImageData(imageData, 0, 0);
+    
+    // let wgt_id = parseInt(canvas.getAttribute("mgr_idx"));
+    // console.log("typeof wgt_id", typeof wgt_id);
+    // myobject.render(wgt_id, w, h);
+    webgl.render(canvas);
 }
 
 const resizeObserver = new ResizeObserver(entries => {
@@ -60,5 +57,14 @@ window.addEventListener("load", () => {
 
     resizeObserver.observe(document.getElementById("placeholder"));
 
+    webgl.init(canvas);
     drawCanvas();
 });
+
+fn_ = (timestamp) => {
+    let canvas = document.getElementById('canvas_area');
+    webgl.render(canvas);
+    window.requestAnimationFrame(fn_);
+}
+
+window.requestAnimationFrame(fn_);

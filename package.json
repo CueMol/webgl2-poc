@@ -12,6 +12,7 @@
     "license": "ISC",
     "dependencies": {
         "electron": "^9.0.5",
+        "gl-matrix": "^3.3.0",
         "nan": "^2.14.1"
     },
     "devDependencies": {
