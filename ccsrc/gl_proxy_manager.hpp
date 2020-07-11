@@ -4,20 +4,24 @@
 
 namespace demo {
 
-class MyObject : public Nan::ObjectWrap
+class GLProxyManager : public Nan::ObjectWrap
 {
 public:
     static NAN_MODULE_INIT(Init);
 
 private:
-    explicit MyObject(double value = 0);
-    ~MyObject();
+    GLProxyManager() : bufsize_(0), bufid_(-1);
+    ~GLProxyManager() = default;
 
     static NAN_METHOD(New);
-    static NAN_METHOD(GetValue);
+
+    // static NAN_METHOD(GetValue);
 
     // Set manager object
     static NAN_METHOD(SetManager);
+
+    // Initialization
+    static NAN_METHOD(Init);
 
     // Render
     static NAN_METHOD(Render);
@@ -25,7 +29,8 @@ private:
     // ctor ??
     static Nan::Persistent<v8::Function> constructor;
 
-    double value_;
+    int bufsize_;
+    int bufid_;
     Nan::Persistent<v8::Object> mgr_;
 };
 

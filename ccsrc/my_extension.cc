@@ -35,8 +35,5 @@ NAN_MODULE_INIT(init)
     demo::MyObject::Init(target);
 }
 
-#ifndef NAN_MODULE_WORKER_ENABLED
-#error "NAN_MODULE_WORKER_ENABLED not defined"
-#endif
 // NODE_MODULE(NODE_GYP_MODULE_NAME, init);
 NAN_MODULE_WORKER_ENABLED(my_extension, init);

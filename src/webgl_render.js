@@ -5,7 +5,11 @@ console.log("glmat:", glmat)
 
 const VERTEX_SIZE = 3; // vec3
 const COLOR_SIZE  = 4; // vec4
-const VERTEX_NUMS = 6;
+const VERTEX_NUMS = 6 * 1000;
+const STRIDE = (VERTEX_SIZE + COLOR_SIZE) * Float32Array.BYTES_PER_ELEMENT;
+const POSITION_OFFSET = 0;
+const COLOR_OFFSET = VERTEX_SIZE * Float32Array.BYTES_PER_ELEMENT;
+
 
 const radius = 100;
 
@@ -15,6 +19,10 @@ function createBuffer(type, typedDataArray) {
     gl.bufferData(type, typedDataArray, gl.STATIC_DRAW);
     gl.bindBuffer(type, null);
     return buffer;
+}
+
+function clamp(min, max, val) {
+    return Math.min(Math.max(min, +val), max);
 }
 
 module.exports = class WebGLRender {
@@ -83,7 +91,6 @@ module.exports = class WebGLRender {
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
         this._vertexBuffer = gl.createBuffer();
-        this._colorBuffer = gl.createBuffer();
         
         // Get attrib/unif loc from program object
         this._vertexAttribLocation = gl.getAttribLocation(program, 'vertexPosition');
@@ -94,46 +101,51 @@ module.exports = class WebGLRender {
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
         gl.enableVertexAttribArray(this._vertexAttribLocation);
+        gl.enableVertexAttribArray(this._colorAttribLocation);
         gl.vertexAttribPointer(this._vertexAttribLocation, VERTEX_SIZE, gl.FLOAT, false, 0, 0);
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._colorBuffer);
-        gl.enableVertexAttribArray(this._colorAttribLocation);
-        gl.vertexAttribPointer(this._colorAttribLocation, COLOR_SIZE, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribPointer(this._vertexAttribLocation, VERTEX_SIZE, gl.FLOAT, false, STRIDE, POSITION_OFFSET);
+        gl.vertexAttribPointer(this._colorAttribLocation, COLOR_SIZE, gl.FLOAT, false, STRIDE, COLOR_OFFSET);
 
-        this._vertices = new Float32Array([
+        const vertices_orig = [
             -30, 30,  0.0,
-            -30, -30, 0.0,
-            30,  30,  0.0,
-            -30, -30, 0.0,
-            30,  -30, 0.0,
-            30,  30,  0.0
-        ]);
-
-        this._colors = new Float32Array([
             1.0, 0.0, 0.0, 1.0,
+            -30, -30, 0.0,
             0.0, 1.0, 0.0, 1.0,
+            30,  30,  0.0,
             0.0, 0.0, 1.0, 1.0,
+            -30, -30, 0.0,
             0.0, 1.0, 0.0, 1.0,
+            30,  -30, 0.0,
             0.0, 0.0, 0.0, 1.0,
-            0.0, 0.0, 1.0, 1.0
-        ]);
+            30,  30,  0.0,
+            0.0, 0.0, 1.0, 1.0,
+        ];
+
+        this._vertices = new Float32Array(VERTEX_NUMS * (VERTEX_SIZE + COLOR_SIZE));
+        for (let i=0; i<VERTEX_NUMS/6; ++i) {
+            const bias = i * 6 * (VERTEX_SIZE + COLOR_SIZE); 
+            for (let j=0; j<6*(VERTEX_SIZE + COLOR_SIZE); ++j) {
+                this._vertices[bias + j] = vertices_orig[j];
+            }
+        }
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, this._vertices, gl.STATIC_DRAW);
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._colorBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, this._colors, gl.STATIC_DRAW);
     }
 
     changeData() {
+        const scl = 1.0;
+    
         for (let i=0; i<VERTEX_NUMS; ++i) {
-            this._vertices[i*3+0] += Math.random() - 0.5;
-            this._vertices[i*3+1] += Math.random() - 0.5;
-            this._vertices[i*3+2] += Math.random() - 0.5;
+            const bias = (VERTEX_SIZE + COLOR_SIZE) * i;
+            this._vertices[bias + 0] += (Math.random() - 0.5) * scl;
+            this._vertices[bias + 1] += (Math.random() - 0.5) * scl;
+            this._vertices[bias + 2] += (Math.random() - 0.5) * scl;
 
-            this._colors[i*4+0] = Math.random();
-            this._colors[i*4+1] = Math.random();
-            this._colors[i*4+2] = Math.random();
+            this._vertices[bias + 3] = clamp(0, 1, (Math.random()-0.5)*0.1 + this._vertices[bias + 3]);
+            this._vertices[bias + 4] = clamp(0, 1, (Math.random()-0.5)*0.1 + this._vertices[bias + 4]);
+            this._vertices[bias + 5] = clamp(0, 1, (Math.random()-0.5)*0.1 + this._vertices[bias + 5]);
         }
     }
 
@@ -160,12 +172,10 @@ module.exports = class WebGLRender {
         gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, this._vertices, gl.STATIC_DRAW);
         gl.enableVertexAttribArray(this._vertexAttribLocation);
-        gl.vertexAttribPointer(this._vertexAttribLocation, VERTEX_SIZE, gl.FLOAT, false, 0, 0);
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._colorBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, this._colors, gl.STATIC_DRAW);
         gl.enableVertexAttribArray(this._colorAttribLocation);
-        gl.vertexAttribPointer(this._colorAttribLocation, COLOR_SIZE, gl.FLOAT, false, 0, 0);
+
+        gl.vertexAttribPointer(this._vertexAttribLocation, VERTEX_SIZE, gl.FLOAT, false, STRIDE, POSITION_OFFSET);
+        gl.vertexAttribPointer(this._colorAttribLocation, COLOR_SIZE, gl.FLOAT, false, STRIDE, COLOR_OFFSET);
 
         gl.drawArrays(gl.TRIANGLES, 0, VERTEX_NUMS);
 
