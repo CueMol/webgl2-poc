@@ -1,18 +1,11 @@
 const {ipcRenderer} = require('electron');
 console.log("Initializing...");
-// import Manager from './context-manager.js'
-const Manager = require('./context-manager');
+
+// const WebGLRender = require('./webgl_native_render');
 const WebGLRender = require('./webgl_render');
 
 
-const myExtension = require('../build/Release/my_extension');
 // console.log(myExtension.hello());
-
-var myobject = new myExtension.MyObject(10);
-
-let mgr = new Manager();
-myobject.setManager(mgr);
-console.log(myobject.getValue());
 
 let webgl = new WebGLRender();
 
@@ -28,9 +21,6 @@ const drawCanvas = () => {
     canvas.width = w;
     canvas.height = h;
     
-    // let wgt_id = parseInt(canvas.getAttribute("mgr_idx"));
-    // console.log("typeof wgt_id", typeof wgt_id);
-    // myobject.render(wgt_id, w, h);
     webgl.render(canvas);
 }
 
@@ -48,8 +38,8 @@ window.addEventListener("load", () => {
     console.log("onLoad() called!!");
 
     canvas = document.getElementById('canvas_area');
-    let id = mgr.registerCanvas(canvas);
-    console.log("register canvas id:", canvas.getAttribute("mgr_idx"));
+    // let id = mgr.registerCanvas(canvas);
+    // console.log("register canvas id:", canvas.getAttribute("mgr_idx"));
 
     elem = document.getElementById("mybutton");
     elem.addEventListener("click", (event) => {

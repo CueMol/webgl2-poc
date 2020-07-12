@@ -1,5 +1,8 @@
-#include <stdlib.h>
 #include "gl_proxy_manager.hpp"
+
+#include <stdlib.h>
+
+#include <algorithm>
 
 namespace demo {
 
@@ -8,12 +11,20 @@ Nan::Persistent<v8::Function> GLProxyManager::constructor;
 NAN_MODULE_INIT(GLProxyManager::Init)
 {
     v8::Local<v8::FunctionTemplate> tpl = Nan::New<v8::FunctionTemplate>(New);
+
+    // Define Class Name
     tpl->SetClassName(Nan::New("GLProxyManager").ToLocalChecked());
+
+    // ??
     tpl->InstanceTemplate()->SetInternalFieldCount(1);
-    SetPrototypeMethod(tpl, "getValue", GetValue);
+
+    // Method Defs
+    // SetPrototypeMethod(tpl, "getValue", GetValue);
     SetPrototypeMethod(tpl, "setManager", SetManager);
+    SetPrototypeMethod(tpl, "create", Create);
     SetPrototypeMethod(tpl, "render", Render);
 
+    // Ctor ??
     constructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
     Nan::Set(target, Nan::New("GLProxyManager").ToLocalChecked(),
              Nan::GetFunction(tpl).ToLocalChecked());
@@ -23,7 +34,7 @@ NAN_METHOD(GLProxyManager::New)
 {
     if (info.IsConstructCall()) {
         double value = info[0]->IsUndefined() ? 0 : Nan::To<double>(info[0]).FromJust();
-        GLProxyManager* obj = new GLProxyManager(value);
+        GLProxyManager* obj = new GLProxyManager();
         obj->Wrap(info.This());
         info.GetReturnValue().Set(info.This());
     } else {
@@ -66,103 +77,114 @@ NAN_METHOD(GLProxyManager::SetManager)
         return;
     }
 
-    printf("SetManager(%p)\n", obj);
     obj->mgr_.Reset(maybe1.ToLocalChecked());
+
+    printf("SetManager(%p) OK\n", obj);
 }
 
-constexpr int VERTEX_SIZE = 3; // vec3
-constexpr int COLOR_SIZE  = 4; // vec4
-constexpr int VERTEX_NUMS = 6;
+// constexpr float vertices_orig[] = {
+//     -30, 30,  0.0, 1.0, 0.0, 0.0, 1.0, -30, -30, 0.0, 0.0, 1.0, 0.0, 1.0,
+//     30,  30,  0.0, 0.0, 0.0, 1.0, 1.0, -30, -30, 0.0, 0.0, 1.0, 0.0, 1.0,
+//     30,  -30, 0.0, 0.0, 0.0, 0.0, 1.0, 30,  30,  0.0, 0.0, 0.0, 1.0, 1.0,
+// };
+constexpr float tri_size = 0.1;
+constexpr float vertices_orig[] = {
+    -tri_size, tri_size,  0.0, 1.0, 0.0, 0.0, 1.0, -tri_size, -tri_size, 0.0, 0.0, 1.0, 0.0, 1.0,
+    tri_size,  tri_size,  0.0, 0.0, 0.0, 1.0, 1.0, -tri_size, -tri_size, 0.0, 0.0, 1.0, 0.0, 1.0,
+    tri_size,  -tri_size, 0.0, 0.0, 0.0, 0.0, 1.0, tri_size,  tri_size,  0.0, 0.0, 0.0, 1.0, 1.0,
+};
 
-NAN_METHOD(GLProxyManager::Init)
+// Create
+NAN_METHOD(GLProxyManager::Create)
 {
     v8::Local<v8::Context> context = info.GetIsolate()->GetCurrentContext();
     GLProxyManager* obj = Nan::ObjectWrap::Unwrap<GLProxyManager>(info.Holder());
+    if (info.Length() != 0) {
+        printf("Invalid num args: %d\n", info.Length());
+        return;
+    }
+
+    // obj->bufsize_ = VERTEX_NUMS * (VERTEX_SIZE + COLOR_SIZE);
+    // obj->buffer_.resize(obj->bufsize_);
+
+    // // Initialize vertex buffer
+    // for (int i = 0; i < VERTEX_NUMS / 6; ++i) {
+    //     const int bias = i * 6 * (VERTEX_SIZE + COLOR_SIZE);
+    //     for (int j = 0; j < 6 * (VERTEX_SIZE + COLOR_SIZE); ++j) {
+    //         obj->buffer_[bias + j] = vertices_orig[j];
+    //     }
+    // }
+    // printf("GLProxyManager::Create OK (bufsize: %d)\n", obj->bufsize_);
+
+    int bufsize = VERTEX_NUMS * (VERTEX_SIZE + COLOR_SIZE);
+    {
+        auto xxx =
+            Nan::Get(Nan::New(obj->mgr_), Nan::New("createBuffer").ToLocalChecked())
+                .ToLocalChecked();
+        auto callback = v8::Local<v8::Function>::Cast(xxx);
+        Nan::Callback cb(callback);
+
+        const int argc = 2;
+        v8::Local<v8::Value> argv[2] = {Nan::New(bufsize), Nan::New(VERTEX_NUMS)};
+        Nan::AsyncResource resource("demo:alloc_buffer");
+        auto rval = cb(&resource, Nan::New(obj->mgr_), argc, argv);
+
+        auto array = v8::Local<v8::ArrayBufferView>::Cast(rval.ToLocalChecked());
+        v8::Local<v8::ArrayBuffer> buffer = array->Buffer();
+        float* data = static_cast<float*>(buffer->GetContents().Data());
+        size_t len = array->ByteLength();
+        printf("buffer ptr: %p, size %d\n", data, len/sizeof(float));
+
+        // Initialize vertex buffer
+        for (int i = 0; i < VERTEX_NUMS / 6; ++i) {
+        // for (int i = 0; i < 10; ++i) {
+            const int bias = i * 6 * STRIDE_SIZE;
+            for (int j = 0; j < 6 * STRIDE_SIZE; ++j) {
+                data[bias + j] = vertices_orig[j];
+                if (bufsize <= bias + j) {
+                    printf("XXXXXXXXXXXXXXXXXXX buffer overrun\n");
+                }
+            }
+        }
+            
+    }
+}
+
+void buffer_delete_callback(char* data, void* the_vector)
+{
+    printf("XXX buffer_delete_callback called!! %p, %p\n", data, the_vector);
+}
+
+NAN_METHOD(GLProxyManager::Render)
+{
+    // printf("GLProxyManager::Render Called\n");
+
+    v8::Local<v8::Context> context = info.GetIsolate()->GetCurrentContext();
+
+    GLProxyManager* obj = Nan::ObjectWrap::Unwrap<GLProxyManager>(info.Holder());
+
     if (info.Length() != 1) {
         printf("Invalid num args: %d\n", info.Length());
         return;
     }
 
-    if (!info[0]->IsInt32()) {
+    if (!info[0]->IsObject()) {
         printf("Invalid arg type\n");
         return;
     }
 
-    int wgt_id = info[0]->Int32Value(context).FromJust();
+    auto array = v8::Local<v8::ArrayBufferView>::Cast(info[0]);
+    v8::Local<v8::ArrayBuffer> buffer = array->Buffer();
+    // char *data = static_cast<char*>(buffer->GetBackingStore()->Data());
+    char* data = static_cast<char*>(buffer->GetContents().Data());
+    // printf("buffer ptr: %p, size %d\n", data, array->ByteLength());
+    obj->updateData(reinterpret_cast<float*>(data));
 
-    printf("render %d\n", wgt_id);
-
-    // Allocate vertex buffer
-    bufsize_ = sizeof(float) * VERTEX_NUMS * (VERTEX_SIZE + COLOR_SIZE); 
-    {
-        auto xxx =
-            Nan::Get(Nan::New(obj->mgr_), Nan::New("allocBuffer").ToLocalChecked())
-                .ToLocalChecked();
-        auto callback = v8::Local<v8::Function>::Cast(xxx);
-        Nan::Callback cb(callback);
-
-        const int argc = 2;
-        v8::Local<v8::Value> argv[2] = {Nan::New(wgt_id),
-                                        Nan::New(bufsize)};
-        Nan::AsyncResource resource("demo:alloc_buffer");
-        auto rval = cb(&resource, Nan::New(obj->mgr_), argc, argv).ToLocalChecked();
-        bufid_ = rval->Int32Value(context).FromJust();
-        printf("alloc buffer ID: %d\n", bufid_);
-    }
-}
-
-NAN_METHOD(GLProxyManager::Render)
-{
-    if (bufid_ < 0) {
-        printf("invalid buffer ID: %d\n", bufid_);
-    }
-
-    v8::Local<v8::Context> context = info.GetIsolate()->GetCurrentContext();
-
-    GLProxyManager* obj = Nan::ObjectWrap::Unwrap<GLProxyManager>(info.Holder());
-
-    char *buffer = nullptr;
-    size_t size = 0;
-    {
-        auto xxx =
-            Nan::Get(Nan::New(obj->mgr_), Nan::New("getBufferPtr").ToLocalChecked())
-                .ToLocalChecked();
-        auto callback = v8::Local<v8::Function>::Cast(xxx);
-        Nan::Callback cb(callback);
-
-        const int argc = 1;
-        v8::Local<v8::Value> argv[1] = {Nan::New(bufid_)};
-        Nan::AsyncResource resource("test:get_buffer_ptr");
-        auto rval = cb(&resource, Nan::New(obj->mgr_), argc, argv).ToLocalChecked();
-
-        if (rval->IsObject()) {
-            buffer = node::Buffer::Data(rval->ToObject(context).ToLocalChecked());
-            size = node::Buffer::Length(rval);
-            printf("buffer ptr: %p, size %d\n", buffer, size);
-        }
-    }
-
-    for (size_t i = 0; i < size; ++i) {
-        // buffer[i] = i;
-        // buffer[i] = rand() % 0xFF;
-        buffer[i] = i % 0xFF;
-    }
-
-    {
-        auto xxx =
-            Nan::Get(Nan::New(obj->mgr_), Nan::New("drawBuffer").ToLocalChecked())
-                .ToLocalChecked();
-        auto callback = v8::Local<v8::Function>::Cast(xxx);
-        Nan::Callback cb(callback);
-
-        const int argc = 2;
-        v8::Local<v8::Value> argv[3] = {Nan::New(wgt_id),
-                                        Nan::New(bufid)};
-        Nan::AsyncResource resource("test:draw_buffer");
-        auto rval = cb(&resource, Nan::New(obj->mgr_), argc, argv).ToLocalChecked();
-        bool bok = rval->Int32Value(context).FromJust();
-        printf("draw buffer OK: %d\n", bok);
-    }
+    // Nan::TypedArrayContents<float> buffer(info[0]);
+    // char* buffer = node::Buffer::Data(info[0]->ToObject(context).ToLocalChecked());
+    // size_t size = node::Buffer::Length(info[0]);
+    // printf("buffer ptr: %p, size %d\n", &(*buffer)[0], buffer.length());
+    // obj->updateData(&(*buffer)[0]);
 }
 
 }  // namespace demo

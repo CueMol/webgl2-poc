@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "my_object.hpp"
+#include "gl_proxy_manager.hpp"
 // #include "my_extension.hpp"
 
 using namespace Nan;
@@ -33,6 +34,7 @@ NAN_MODULE_INIT(init)
              GetFunction(New<FunctionTemplate>(hello)).ToLocalChecked());
 
     demo::MyObject::Init(target);
+    demo::GLProxyManager::Init(target);
 }
 
 // NODE_MODULE(NODE_GYP_MODULE_NAME, init);

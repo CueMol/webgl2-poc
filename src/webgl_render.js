@@ -5,7 +5,7 @@ console.log("glmat:", glmat)
 
 const VERTEX_SIZE = 3; // vec3
 const COLOR_SIZE  = 4; // vec4
-const VERTEX_NUMS = 6 * 1000;
+const VERTEX_NUMS = 6 * 1000 * 1000;
 const STRIDE = (VERTEX_SIZE + COLOR_SIZE) * Float32Array.BYTES_PER_ELEMENT;
 const POSITION_OFFSET = 0;
 const COLOR_OFFSET = VERTEX_SIZE * Float32Array.BYTES_PER_ELEMENT;
@@ -13,17 +13,37 @@ const COLOR_OFFSET = VERTEX_SIZE * Float32Array.BYTES_PER_ELEMENT;
 
 const radius = 100;
 
-function createBuffer(type, typedDataArray) {
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(type, buffer);
-    gl.bufferData(type, typedDataArray, gl.STATIC_DRAW);
-    gl.bindBuffer(type, null);
-    return buffer;
-}
+// function createBuffer(type, typedDataArray) {
+//     const buffer = gl.createBuffer();
+//     gl.bindBuffer(type, buffer);
+//     gl.bufferData(type, typedDataArray, gl.STATIC_DRAW);
+//     gl.bindBuffer(type, null);
+//     return buffer;
+// }
 
 function clamp(min, max, val) {
     return Math.min(Math.max(min, +val), max);
 }
+
+function randomUniform() {
+    return Math.random() - 0.5;
+}
+
+const tri_size = 0.1;
+const vertices_orig = [
+    -tri_size, tri_size,  0.0,
+    1.0, 0.0, 0.0, 1.0,
+    -tri_size, -tri_size, 0.0,
+    0.0, 1.0, 0.0, 1.0,
+    tri_size,  tri_size,  0.0,
+    0.0, 0.0, 1.0, 1.0,
+    -tri_size, -tri_size, 0.0,
+    0.0, 1.0, 0.0, 1.0,
+    tri_size,  -tri_size, 0.0,
+    0.0, 0.0, 0.0, 1.0,
+    tri_size,  tri_size,  0.0,
+    0.0, 0.0, 1.0, 1.0,
+];
 
 module.exports = class WebGLRender {
     constructor() {
@@ -90,8 +110,6 @@ module.exports = class WebGLRender {
         // gl.enable(gl.CULL_FACE);
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
-        this._vertexBuffer = gl.createBuffer();
-        
         // Get attrib/unif loc from program object
         this._vertexAttribLocation = gl.getAttribLocation(program, 'vertexPosition');
         this._colorAttribLocation  = gl.getAttribLocation(program, 'color');
@@ -99,29 +117,7 @@ module.exports = class WebGLRender {
         this._viewLocation = gl.getUniformLocation(program, 'view');
         this._projectionLocation = gl.getUniformLocation(program, 'projection');
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
-        gl.enableVertexAttribArray(this._vertexAttribLocation);
-        gl.enableVertexAttribArray(this._colorAttribLocation);
-        gl.vertexAttribPointer(this._vertexAttribLocation, VERTEX_SIZE, gl.FLOAT, false, 0, 0);
-
-        gl.vertexAttribPointer(this._vertexAttribLocation, VERTEX_SIZE, gl.FLOAT, false, STRIDE, POSITION_OFFSET);
-        gl.vertexAttribPointer(this._colorAttribLocation, COLOR_SIZE, gl.FLOAT, false, STRIDE, COLOR_OFFSET);
-
-        const vertices_orig = [
-            -30, 30,  0.0,
-            1.0, 0.0, 0.0, 1.0,
-            -30, -30, 0.0,
-            0.0, 1.0, 0.0, 1.0,
-            30,  30,  0.0,
-            0.0, 0.0, 1.0, 1.0,
-            -30, -30, 0.0,
-            0.0, 1.0, 0.0, 1.0,
-            30,  -30, 0.0,
-            0.0, 0.0, 0.0, 1.0,
-            30,  30,  0.0,
-            0.0, 0.0, 1.0, 1.0,
-        ];
-
+        // Prepare vertex data
         this._vertices = new Float32Array(VERTEX_NUMS * (VERTEX_SIZE + COLOR_SIZE));
         for (let i=0; i<VERTEX_NUMS/6; ++i) {
             const bias = i * 6 * (VERTEX_SIZE + COLOR_SIZE); 
@@ -130,23 +126,39 @@ module.exports = class WebGLRender {
             }
         }
 
+        // Prepare VBO
+        this._vertexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
+        gl.enableVertexAttribArray(this._vertexAttribLocation);
+        gl.enableVertexAttribArray(this._colorAttribLocation);
+        gl.vertexAttribPointer(this._vertexAttribLocation, VERTEX_SIZE, gl.FLOAT, false, STRIDE, POSITION_OFFSET);
+        gl.vertexAttribPointer(this._colorAttribLocation, COLOR_SIZE, gl.FLOAT, false, STRIDE, COLOR_OFFSET);
+
+        // Transfer VBO to GPU
         gl.bufferData(gl.ARRAY_BUFFER, this._vertices, gl.STATIC_DRAW);
+
+        // reset
+        gl.useProgram(null);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        
+        console.log("Initialized", VERTEX_NUMS * (VERTEX_SIZE + COLOR_SIZE));
     }
 
     changeData() {
-        const scl = 1.0;
+        const scl = 0.1;
     
-        for (let i=0; i<VERTEX_NUMS; ++i) {
+         for (let i=0; i<VERTEX_NUMS; ++i) {
+        //for (let i=0; i<6 * 10; ++i) {
             const bias = (VERTEX_SIZE + COLOR_SIZE) * i;
-            this._vertices[bias + 0] += (Math.random() - 0.5) * scl;
-            this._vertices[bias + 1] += (Math.random() - 0.5) * scl;
-            this._vertices[bias + 2] += (Math.random() - 0.5) * scl;
+            this._vertices[bias + 0] += randomUniform() * scl;
+            this._vertices[bias + 1] += randomUniform() * scl;
+            this._vertices[bias + 2] += randomUniform() * scl;
 
-            this._vertices[bias + 3] = clamp(0, 1, (Math.random()-0.5)*0.1 + this._vertices[bias + 3]);
-            this._vertices[bias + 4] = clamp(0, 1, (Math.random()-0.5)*0.1 + this._vertices[bias + 4]);
-            this._vertices[bias + 5] = clamp(0, 1, (Math.random()-0.5)*0.1 + this._vertices[bias + 5]);
+            this._vertices[bias + 3] = clamp(0, 1, randomUniform()*0.1 + this._vertices[bias + 3]);
+            this._vertices[bias + 4] = clamp(0, 1, randomUniform()*0.1 + this._vertices[bias + 4]);
+            this._vertices[bias + 5] = clamp(0, 1, randomUniform()*0.1 + this._vertices[bias + 5]);
         }
+
     }
 
     render(canvas) {
@@ -170,14 +182,19 @@ module.exports = class WebGLRender {
 
         this.changeData();
         gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, this._vertices, gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(this._vertexAttribLocation);
-        gl.enableVertexAttribArray(this._colorAttribLocation);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this._vertices);
+        // gl.bufferData(gl.ARRAY_BUFFER, this._vertices, gl.STATIC_DRAW);
 
-        gl.vertexAttribPointer(this._vertexAttribLocation, VERTEX_SIZE, gl.FLOAT, false, STRIDE, POSITION_OFFSET);
-        gl.vertexAttribPointer(this._colorAttribLocation, COLOR_SIZE, gl.FLOAT, false, STRIDE, COLOR_OFFSET);
+        // gl.enableVertexAttribArray(this._vertexAttribLocation);
+        // gl.enableVertexAttribArray(this._colorAttribLocation);
+        // gl.vertexAttribPointer(this._vertexAttribLocation, VERTEX_SIZE, gl.FLOAT, false, STRIDE, POSITION_OFFSET);
+        // gl.vertexAttribPointer(this._colorAttribLocation, COLOR_SIZE, gl.FLOAT, false, STRIDE, COLOR_OFFSET);
 
         gl.drawArrays(gl.TRIANGLES, 0, VERTEX_NUMS);
+
+        // reset
+        gl.useProgram(null);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
         gl.flush();
         // console.log("render OK.", this._radian);
