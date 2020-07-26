@@ -28,8 +28,11 @@ module.exports = class WebGLRender {
     }
 
     render(canvas) {
-        this._proxy.render(this._mgr._buf);
-        this._mgr.sendBuffer();
+        this._proxy.render();
         this._mgr.displayAll();
+
+        // this._proxy.render(this._mgr._buf);
+        // this._mgr.sendBuffer();
+        // this._mgr.displayAll();
     }
 }

@@ -87,12 +87,35 @@ NAN_METHOD(GLProxyManager::SetManager)
 //     30,  30,  0.0, 0.0, 0.0, 1.0, 1.0, -30, -30, 0.0, 0.0, 1.0, 0.0, 1.0,
 //     30,  -30, 0.0, 0.0, 0.0, 0.0, 1.0, 30,  30,  0.0, 0.0, 0.0, 1.0, 1.0,
 // };
-constexpr float tri_size = 0.1;
+constexpr float tri_size = 10.0;
 constexpr float vertices_orig[] = {
-    -tri_size, tri_size,  0.0, 1.0, 0.0, 0.0, 1.0, -tri_size, -tri_size, 0.0, 0.0, 1.0, 0.0, 1.0,
-    tri_size,  tri_size,  0.0, 0.0, 0.0, 1.0, 1.0, -tri_size, -tri_size, 0.0, 0.0, 1.0, 0.0, 1.0,
-    tri_size,  -tri_size, 0.0, 0.0, 0.0, 0.0, 1.0, tri_size,  tri_size,  0.0, 0.0, 0.0, 1.0, 1.0,
+    -tri_size, tri_size,  0.0, 1.0, 0.0, 0.0, 1.0,
+    -tri_size, -tri_size, 0.0, 0.0, 1.0, 0.0, 1.0,
+    tri_size,  tri_size,  0.0, 0.0, 0.0, 1.0, 1.0,
+    -tri_size, -tri_size, 0.0, 0.0, 1.0, 0.0, 1.0,
+    tri_size,  -tri_size, 0.0, 0.0, 0.0, 0.0, 1.0,
+    tri_size,  tri_size,  0.0, 0.0, 0.0, 1.0, 1.0,
 };
+
+float* GLProxyManager::getBuffer(int bufid)
+{
+    auto xxx = Nan::Get(Nan::New(mgr_), Nan::New("getBuffer").ToLocalChecked())
+                   .ToLocalChecked();
+    auto callback = v8::Local<v8::Function>::Cast(xxx);
+    Nan::Callback cb(callback);
+    const int argc = 1;
+    v8::Local<v8::Value> argv[1] = {Nan::New(bufid)};
+    Nan::AsyncResource resource("demo:get_buffer");
+    auto rval = cb(&resource, Nan::New(mgr_), argc, argv);
+
+    auto array = v8::Local<v8::ArrayBufferView>::Cast(rval.ToLocalChecked());
+    v8::Local<v8::ArrayBuffer> buffer = array->Buffer();
+    float* data = static_cast<float*>(buffer->GetContents().Data());
+    // size_t len = array->ByteLength();
+    // printf("buffer ptr: %p, size %d\n", data, len / sizeof(float));
+
+    return data;
+}
 
 // Create
 NAN_METHOD(GLProxyManager::Create)
@@ -104,18 +127,7 @@ NAN_METHOD(GLProxyManager::Create)
         return;
     }
 
-    // obj->bufsize_ = VERTEX_NUMS * (VERTEX_SIZE + COLOR_SIZE);
-    // obj->buffer_.resize(obj->bufsize_);
-
-    // // Initialize vertex buffer
-    // for (int i = 0; i < VERTEX_NUMS / 6; ++i) {
-    //     const int bias = i * 6 * (VERTEX_SIZE + COLOR_SIZE);
-    //     for (int j = 0; j < 6 * (VERTEX_SIZE + COLOR_SIZE); ++j) {
-    //         obj->buffer_[bias + j] = vertices_orig[j];
-    //     }
-    // }
-    // printf("GLProxyManager::Create OK (bufsize: %d)\n", obj->bufsize_);
-
+    // CreateBuffer(bufsize, nelems) -> buf_id
     int bufsize = VERTEX_NUMS * (VERTEX_SIZE + COLOR_SIZE);
     {
         auto xxx =
@@ -129,15 +141,34 @@ NAN_METHOD(GLProxyManager::Create)
         Nan::AsyncResource resource("demo:alloc_buffer");
         auto rval = cb(&resource, Nan::New(obj->mgr_), argc, argv);
 
-        auto array = v8::Local<v8::ArrayBufferView>::Cast(rval.ToLocalChecked());
-        v8::Local<v8::ArrayBuffer> buffer = array->Buffer();
-        float* data = static_cast<float*>(buffer->GetContents().Data());
-        size_t len = array->ByteLength();
-        printf("buffer ptr: %p, size %d\n", data, len/sizeof(float));
+        obj->bufid_ = rval.ToLocalChecked()->Int32Value(context).FromJust();
+        printf("buffer ID: %d\n", obj->bufid_);
+    }
 
-        // Initialize vertex buffer
+    // GetBuffer(buf_id) -> buf_ptr
+    float* data = obj->getBuffer(obj->bufid_);
+    // {
+    //     auto xxx = Nan::Get(Nan::New(obj->mgr_),
+    //     Nan::New("getBuffer").ToLocalChecked())
+    //                    .ToLocalChecked();
+    //     auto callback = v8::Local<v8::Function>::Cast(xxx);
+    //     Nan::Callback cb(callback);
+    //     const int argc = 1;
+    //     v8::Local<v8::Value> argv[1] = {Nan::New(this.bufid_)};
+    //     Nan::AsyncResource resource("demo:get_buffer");
+    //     auto rval = cb(&resource, Nan::New(obj->mgr_), argc, argv);
+
+    //     auto array = v8::Local<v8::ArrayBufferView>::Cast(rval.ToLocalChecked());
+    //     v8::Local<v8::ArrayBuffer> buffer = array->Buffer();
+    //     data = static_cast<float*>(buffer->GetContents().Data());
+    //     size_t len = array->ByteLength();
+    //     printf("buffer ptr: %p, size %d\n", data, len / sizeof(float));
+    // }
+
+    // Initialize vertex buffer
+    {
         for (int i = 0; i < VERTEX_NUMS / 6; ++i) {
-        // for (int i = 0; i < 10; ++i) {
+            // for (int i = 0; i < 10; ++i) {
             const int bias = i * 6 * STRIDE_SIZE;
             for (int j = 0; j < 6 * STRIDE_SIZE; ++j) {
                 data[bias + j] = vertices_orig[j];
@@ -146,45 +177,66 @@ NAN_METHOD(GLProxyManager::Create)
                 }
             }
         }
-            
     }
 }
 
-void buffer_delete_callback(char* data, void* the_vector)
-{
-    printf("XXX buffer_delete_callback called!! %p, %p\n", data, the_vector);
-}
+// void buffer_delete_callback(char* data, void* the_vector)
+// {
+//     printf("XXX buffer_delete_callback called!! %p, %p\n", data, the_vector);
+// }
+
+// NAN_METHOD(GLProxyManager::Render)
+// {
+//     // printf("GLProxyManager::Render Called\n");
+
+//     v8::Local<v8::Context> context = info.GetIsolate()->GetCurrentContext();
+
+//     GLProxyManager* obj = Nan::ObjectWrap::Unwrap<GLProxyManager>(info.Holder());
+
+//     if (info.Length() != 1) {
+//         printf("Invalid num args: %d\n", info.Length());
+//         return;
+//     }
+
+//     if (!info[0]->IsObject()) {
+//         printf("Invalid arg type\n");
+//         return;
+//     }
+
+//     auto array = v8::Local<v8::ArrayBufferView>::Cast(info[0]);
+//     v8::Local<v8::ArrayBuffer> buffer = array->Buffer();
+//     // char *data = static_cast<char*>(buffer->GetBackingStore()->Data());
+//     char* data = static_cast<char*>(buffer->GetContents().Data());
+//     // printf("buffer ptr: %p, size %d\n", data, array->ByteLength());
+//     obj->updateData(reinterpret_cast<float*>(data));
+
+//     // Nan::TypedArrayContents<float> buffer(info[0]);
+//     // char* buffer =
+//     node::Buffer::Data(info[0]->ToObject(context).ToLocalChecked());
+//     // size_t size = node::Buffer::Length(info[0]);
+//     // printf("buffer ptr: %p, size %d\n", &(*buffer)[0], buffer.length());
+//     // obj->updateData(&(*buffer)[0]);
+// }
 
 NAN_METHOD(GLProxyManager::Render)
 {
-    // printf("GLProxyManager::Render Called\n");
-
     v8::Local<v8::Context> context = info.GetIsolate()->GetCurrentContext();
-
     GLProxyManager* obj = Nan::ObjectWrap::Unwrap<GLProxyManager>(info.Holder());
 
-    if (info.Length() != 1) {
-        printf("Invalid num args: %d\n", info.Length());
-        return;
+    float* data = obj->getBuffer(obj->bufid_);
+    obj->updateData(data);
+
+    // sendBuffer(bufid) -> void
+    {
+        auto xxx = Nan::Get(Nan::New(obj->mgr_), Nan::New("sendBuffer").ToLocalChecked())
+                       .ToLocalChecked();
+        auto callback = v8::Local<v8::Function>::Cast(xxx);
+        Nan::Callback cb(callback);
+        const int argc = 1;
+        v8::Local<v8::Value> argv[1] = {Nan::New(obj->bufid_)};
+        Nan::AsyncResource resource("demo:send_buffer");
+        cb(&resource, Nan::New(obj->mgr_), argc, argv);
     }
-
-    if (!info[0]->IsObject()) {
-        printf("Invalid arg type\n");
-        return;
-    }
-
-    auto array = v8::Local<v8::ArrayBufferView>::Cast(info[0]);
-    v8::Local<v8::ArrayBuffer> buffer = array->Buffer();
-    // char *data = static_cast<char*>(buffer->GetBackingStore()->Data());
-    char* data = static_cast<char*>(buffer->GetContents().Data());
-    // printf("buffer ptr: %p, size %d\n", data, array->ByteLength());
-    obj->updateData(reinterpret_cast<float*>(data));
-
-    // Nan::TypedArrayContents<float> buffer(info[0]);
-    // char* buffer = node::Buffer::Data(info[0]->ToObject(context).ToLocalChecked());
-    // size_t size = node::Buffer::Length(info[0]);
-    // printf("buffer ptr: %p, size %d\n", &(*buffer)[0], buffer.length());
-    // obj->updateData(&(*buffer)[0]);
 }
 
 }  // namespace demo

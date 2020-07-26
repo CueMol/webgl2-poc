@@ -1,8 +1,8 @@
 const {ipcRenderer} = require('electron');
 console.log("Initializing...");
 
-// const WebGLRender = require('./webgl_native_render');
-const WebGLRender = require('./webgl_render');
+const WebGLRender = require('./webgl_native_render');
+// const WebGLRender = require('./webgl_render');
 
 
 // console.log(myExtension.hello());

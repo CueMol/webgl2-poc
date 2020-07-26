@@ -180,9 +180,9 @@ module.exports = class WebGLRender {
 
         this._data = [];
         this._data[0] = new GLObject(0, 0, 0,  0.1, 0.001);
-        this._data[1] = new GLObject(0, 0, 50, 1.0, 0.2);
-        this._data[2] = new GLObject(0, 50, 0, 0.2, 0.1);
-        this._data[3] = new GLObject(50, 0, 0, 0.5, 0.5);
+        // this._data[1] = new GLObject(0, 0, 50, 1.0, 0.2);
+        // this._data[2] = new GLObject(0, 50, 0, 0.2, 0.1);
+        // this._data[3] = new GLObject(50, 0, 0, 0.5, 0.5);
     }
 
     setUpModelMat(gl, radian) {
